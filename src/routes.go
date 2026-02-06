@@ -12,6 +12,7 @@ func router() http.Handler {
 	// Routes techniques
 	mux.HandleFunc("GET /cpu", CPUHandler)
 	mux.HandleFunc("GET /ps", PSHandler)
+	mux.HandleFunc("GET /ps/kill/{pid}", PSKillHandler)
 	mux.HandleFunc("GET /ps/{user}", PSUserHandler)
 	mux.HandleFunc("GET /net", NetHandler)
 	mux.HandleFunc("GET /net/{card}", NetNameHandler)
