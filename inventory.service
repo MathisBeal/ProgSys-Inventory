@@ -1,0 +1,12 @@
+[Unit]
+Description=My Build Process
+
+[Service]
+ExecStart=/root/inventory
+WorkingDirectory=/root/
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+
