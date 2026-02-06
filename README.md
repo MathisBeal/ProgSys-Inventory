@@ -54,6 +54,22 @@ Les pages se rafraîchissent automatiquement (généralement toutes les 5 second
 ### Processus
 - `GET /ps` : tous les processus
 - `GET /ps/{user}` : processus d’un utilisateur
+- `GET /ps/kill/{pid}` : termine le processus correspondant au PID
+
+Détail de `GET /ps/kill/{pid}` :
+
+- Paramètre : `pid` (entier).
+- Succès : réponse JSON de confirmation, par exemple `{"status":"killed","pid":1234}`.
+- Erreurs :
+  - `400` si le PID est invalide (non numérique).
+  - `500` si le processus n’existe pas ou ne peut pas être tué (permissions insuffisantes, etc.).
+- Exemple :
+
+```bash
+curl http://localhost/ps/kill/1234
+```
+
+⚠️ Endpoint sensible : à exposer uniquement sur un réseau de confiance (ou derrière authentification).
 
 ### Réseau
 - `GET /net` : toutes les interfaces

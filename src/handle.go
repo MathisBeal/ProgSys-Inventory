@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/evoliatis/buildup/cpu"
 	"github.com/evoliatis/buildup/disk"
@@ -38,6 +39,27 @@ func PSUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(myProcs)
+}
+
+func PSKillHandler(w http.ResponseWriter, r *http.Request) {
+	pidRaw := r.PathValue("pid")
+	pid, err := strconv.ParseInt(pidRaw, 10, 32)
+	if err != nil {
+		http.Error(w, "invalid pid", http.StatusBadRequest)
+		return
+	}
+
+	err = proc.KillProcess(int32(pid))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status": "killed",
+		"pid":    pid,
+	})
 }
 
 func NetHandler(w http.ResponseWriter, r *http.Request) {

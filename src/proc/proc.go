@@ -41,3 +41,12 @@ func ReadProc(user string) (*[]Proc, error) {
 
 	return &myProcs, nil
 }
+
+func KillProcess(pid int32) error {
+	myProc, err := process.NewProcess(pid)
+	if err != nil {
+		return err
+	}
+
+	return myProc.Kill()
+}
