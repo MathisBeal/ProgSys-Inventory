@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Réseau — interfaces & débits</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin:0; padding:24px; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:canvas; color:canvastext; }
+    .card { max-width:1200px; margin:0 auto 16px; padding:16px 20px;
+            border:1px solid color-mix(in oklab, canvastext 15%, transparent);
+            border-radius:16px;
+            background:color-mix(in oklab, canvas 92%, canvastext 0%);
+            box-shadow:0 1px 8px color-mix(in oklab, canvastext 10%, transparent); }
+    h1 { margin:0 0 8px; font-size:1.25rem; }
+    .muted { opacity:.75; font-size:.9rem; }
+    .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+    .btn { padding:6px 10px; border-radius:10px; border:1px solid color-mix(in oklab, dodgerblue 40%, transparent);
+           background: color-mix(in oklab, dodgerblue 35%, canvas); color:white; cursor:pointer; }
+    .btn[disabled]{ opacity:.6; cursor:default; }
+    .pill { display:inline-block; padding:.1rem .45rem; border-radius:.75rem;
+            border:1px solid color-mix(in oklab, canvastext 25%, transparent); font-size:.85rem; }
+    input[type="checkbox"]{ transform: translateY(1px); }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:8px 10px; border-bottom:1px solid color-mix(in oklab, canvastext 12%, transparent); text-align:left; vertical-align:top; }
+    th { font-weight:600; user-select:none; cursor:pointer; }
+    .right { text-align:right; }
+    .mono { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            font-size:.9rem; font-variant-numeric: tabular-nums; }
+    .addr { display:inline-block; margin:2px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .small { font-size:.9rem; opacity:.9; }
+  </style>
+</head>
+<body>
+
+  <section class="card">
+    <h1>Interfaces réseau</h1>
+    <div class="muted">Source : <code>/net</code> — calcul des débits via delta <span class="mono">bytes</span> — rafraîchissement toutes les 5s</div>
+    <div class="toolbar">
+      <label class="small"><input id="inclLo" type="checkbox"> inclure loopback</label>
+      <label class="small"><input id="onlyUp" type="checkbox" checked> seulement interfaces "up"</label>
+      <span id="count" class="pill">0 interfaces</span>
+      <button id="refresh" class="btn" type="button">Rafraîchir</button>
+      <span id="ts" class="muted"></span>
+      <span id="statusText" class="muted"></span>
+    </div>
+    <div class="muted small" style="margin-top:8px">
+      Tri: clique sur <span class="mono">Rx</span> / <span class="mono">Tx</span> / <span class="mono">Interface</span>.
+    </div>
+  </section>
+
+  <section class="card">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="name">Interface</th>
+          <th class="noclick">Adresses</th>
+          <th class="right" data-sort="rx">Rx (Mb/s)</th>
+          <th class="right" data-sort="tx">Tx (Mb/s)</th>
+          <th class="right" data-sort="rxB">Rx total</th>
+          <th class="right" data-sort="txB">Tx total</th>
+          <th class="right" data-sort="mtu">MTU</th>
+          <th class="noclick">Flags / MAC</th>
+          <th class="right" data-sort="drops">Drops</th>
+          <th class="right" data-sort="errs">Errors</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="10" class="muted">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <script>
+    const NET_URL = '/net';
+    const REFRESH_INTERVAL = 5000; // 5s
+    let refreshing = false;
+
+    // For rate computation
+    const prev = new Map(); // name -> {t, rx, tx}
+
+    // Sorting
+    let sortKey = 'rx';
+    let sortDir = 'desc';
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    function num(x){ x = Number(x); return Number.isFinite(x) ? x : 0; }
+
+    function fmtBytes(n) {
+      n = Number(n)||0;
+      const units = ['B','KiB','MiB','GiB','TiB','PiB'];
+      let i = 0;
+      while (n >= 1024 && i < units.length-1) { n /= 1024; i++; }
+      const s = (n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : n.toFixed(0));
+      return s + ' ' + units[i];
+    }
+
+    function computeRates(items) {
+      const now = Date.now();
+      items.forEach(it => {
+        const name = (it.interface && it.interface.name) || (it.io && it.io.name) || '';
+        const io = it.io || {};
+        const rx = num(io.bytesRecv);
+        const tx = num(io.bytesSent);
+
+        const p = prev.get(name);
+        if (!p) {
+          prev.set(name, { t: now, rx, tx, rx_mbps: 0, tx_mbps: 0 });
+          it._rx_mbps = 0; it._tx_mbps = 0;
+          return;
+        }
+
+        const dt = Math.max(0.001, (now - p.t) / 1000); // seconds
+        const drx = Math.max(0, rx - p.rx);
+        const dtx = Math.max(0, tx - p.tx);
+
+        // bytes/s -> Mb/s (decimal megabit)
+        const rx_mbps = (drx * 8) / dt / 1_000_000;
+        const tx_mbps = (dtx * 8) / dt / 1_000_000;
+
+        prev.set(name, { t: now, rx, tx, rx_mbps, tx_mbps });
+
+        it._rx_mbps = rx_mbps;
+        it._tx_mbps = tx_mbps;
+      });
+      return items;
+    }
+
+    function applyFilters(items) {
+      const inclLo = document.getElementById('inclLo').checked;
+      const onlyUp = document.getElementById('onlyUp').checked;
+
+      return (items || []).filter(it => {
+        const inf = it.interface || {};
+        const name = String(inf.name || '');
+        const flags = Array.isArray(inf.flags) ? inf.flags : [];
+
+        if (!inclLo && name === 'lo') return false;
+        if (onlyUp && !flags.includes('up')) return false;
+
+        return true;
+      });
+    }
+
+    function comparator(a, b) {
+      const dir = (sortDir === 'asc') ? 1 : -1;
+
+      const ai = a.interface || {};
+      const bi = b.interface || {};
+      const aio = a.io || {};
+      const bio = b.io || {};
+
+      if (sortKey === 'name') return dir * String(ai.name||'').localeCompare(String(bi.name||''), 'fr', {sensitivity:'base'});
+      if (sortKey === 'rx') return dir * (num(a._rx_mbps) - num(b._rx_mbps));
+      if (sortKey === 'tx') return dir * (num(a._tx_mbps) - num(b._tx_mbps));
+      if (sortKey === 'rxB') return dir * (num(aio.bytesRecv) - num(bio.bytesRecv));
+      if (sortKey === 'txB') return dir * (num(aio.bytesSent) - num(bio.bytesSent));
+      if (sortKey === 'mtu') return dir * (num(ai.mtu) - num(bi.mtu));
+      if (sortKey === 'drops') return dir * ((num(aio.dropin)+num(aio.dropout)) - (num(bio.dropin)+num(bio.dropout)));
+      if (sortKey === 'errs') return dir * ((num(aio.errin)+num(aio.errout)) - (num(bio.errin)+num(bio.errout)));
+      return 0;
+    }
+
+    function render(items) {
+      const tbody = document.getElementById('tbody');
+      const count = document.getElementById('count');
+
+      if (!Array.isArray(items) || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="muted">Aucune interface</td></tr>';
+        count.textContent = '0 interfaces';
+        return;
+      }
+
+      count.textContent = items.length + ' interfaces';
+
+      tbody.innerHTML = items.map(it => {
+        const inf = it.interface || {};
+        const io  = it.io || {};
+        const name = inf.name || io.name || '';
+        const mtu = inf.mtu ?? '';
+        const mac = inf.hardwareAddr || '';
+        const flags = Array.isArray(inf.flags) ? inf.flags : [];
+        const addrs = Array.isArray(inf.addrs) ? inf.addrs : [];
+        const addrHtml = addrs.map(a => '<div class="mono addr">' + esc(a.addr || '') + '</div>').join('') || '<span class="muted">—</span>';
+
+        const rx_mbps = num(it._rx_mbps);
+        const tx_mbps = num(it._tx_mbps);
+
+        const dropIn = num(io.dropin), dropOut = num(io.dropout);
+        const errIn  = num(io.errin),  errOut  = num(io.errout);
+
+        const flagsHtml = flags.map(f => '<span class="pill">' + esc(f) + '</span>').join(' ') || '<span class="muted">—</span>';
+
+        return '<tr>'
+          + '<td><span class="pill mono">' + esc(name) + '</span></td>'
+          + '<td>' + addrHtml + '</td>'
+          + '<td class="right mono">' + rx_mbps.toFixed(3) + '</td>'
+          + '<td class="right mono">' + tx_mbps.toFixed(3) + '</td>'
+          + '<td class="right mono">' + esc(fmtBytes(io.bytesRecv)) + '</td>'
+          + '<td class="right mono">' + esc(fmtBytes(io.bytesSent)) + '</td>'
+          + '<td class="right mono">' + esc(mtu) + '</td>'
+          + '<td class="mono">' + flagsHtml + (mac ? ('<div class="muted mono" style="margin-top:4px">' + esc(mac) + '</div>') : '') + '</td>'
+          + '<td class="right mono">' + (dropIn + dropOut) + '</td>'
+          + '<td class="right mono">' + (errIn + errOut) + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    let DATA = [];
+
+    async function loadNet() {
+      if (refreshing) return;
+      refreshing = true;
+
+      const statusText = document.getElementById('statusText');
+      statusText.textContent = '⏳ mise à jour…';
+
+      try {
+        const res = await fetch(NET_URL, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const arr = await res.json();
+        DATA = Array.isArray(arr) ? arr : [];
+
+        computeRates(DATA);
+
+        let view = applyFilters(DATA).slice().sort(comparator);
+        render(view);
+
+        document.getElementById('ts').textContent = 'Mis à jour : ' + new Date().toLocaleTimeString();
+        statusText.textContent = '✅ OK';
+      } catch (e) {
+        document.getElementById('tbody').innerHTML =
+          '<tr><td colspan="10" class="muted">Erreur: ' + esc(e.message) + '</td></tr>';
+        document.getElementById('count').textContent = '0 interfaces';
+        statusText.textContent = '❌ ' + e.message;
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    // UI events
+    document.getElementById('inclLo').addEventListener('change', () => render(applyFilters(DATA).slice().sort(comparator)));
+    document.getElementById('onlyUp').addEventListener('change', () => render(applyFilters(DATA).slice().sort(comparator)));
+
+    document.getElementById('refresh').addEventListener('click', async function(){
+      const btn = this, prev = btn.textContent;
+      btn.disabled = true; btn.textContent = '…';
+      try { await loadNet(); }
+      finally { btn.disabled = false; btn.textContent = prev; }
+    });
+
+    // Click headers to toggle sorting
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const k = th.getAttribute('data-sort');
+        if (!k) return;
+        if (sortKey === k) sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+        else {
+          sortKey = k;
+          sortDir = (k === 'name' || k === 'mtu') ? 'asc' : 'desc';
+        }
+        render(applyFilters(DATA).slice().sort(comparator));
+      });
+    });
+
+    // initial + 5s refresh
+    loadNet();
+    setInterval(loadNet, REFRESH_INTERVAL);
+  </script>
+
+</body>
+</html>

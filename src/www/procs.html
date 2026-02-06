@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Processus système</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin:0; padding:24px; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:canvas; color:canvastext; }
+    .card { max-width:1200px; margin:0 auto 16px; padding:16px 20px; border:1px solid color-mix(in oklab, canvastext 15%, transparent); border-radius:16px; background:color-mix(in oklab, canvas 92%, canvastext 0%); box-shadow:0 1px 8px color-mix(in oklab, canvastext 10%, transparent); }
+    h1 { margin:0 0 8px; font-size:1.25rem; }
+    .muted { opacity:.75; font-size:.9rem; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:8px 10px; border-bottom:1px solid color-mix(in oklab, canvastext 12%, transparent); text-align:left; vertical-align:top; }
+    th { font-weight:600; user-select:none; cursor:pointer; }
+    th.noclick { cursor:default; }
+    .right { text-align:right; }
+    .mono { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:.9rem; font-variant-numeric: tabular-nums; }
+    .nowrap { white-space:nowrap; }
+    .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    input[type="text"], select { padding:6px 8px; border-radius:10px; border:1px solid color-mix(in oklab, canvastext 25%, transparent); background: color-mix(in oklab, canvas 95%, canvastext 0%); color:inherit; }
+    .pill { display:inline-block; padding:.1rem .45rem; border-radius:.75rem; border:1px solid color-mix(in oklab, canvastext 25%, transparent); font-size:.85rem; }
+    .btn { padding:6px 10px; border-radius:10px; border:1px solid color-mix(in oklab, dodgerblue 40%, transparent); background: color-mix(in oklab, dodgerblue 35%, canvas); color:white; cursor:pointer; }
+    .btn[disabled]{ opacity:.6; cursor:default; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .hint { font-size:.85rem; opacity:.75; }
+  </style>
+</head>
+<body>
+
+  <section class="card">
+    <h1>Processus système</h1>
+    <div class="muted">Source : <code>/ps</code> — rafraîchissement toutes les 5s</div>
+    <div class="toolbar" style="margin-top:8px">
+      <label>Filtrer : <input id="q" type="text" placeholder="nom, user, pid…"></label>
+      <label>Statut :
+        <select id="status">
+          <option value="">(tous)</option>
+          <option value="running">running</option>
+          <option value="sleep">sleep</option>
+          <option value="idle">idle</option>
+          <option value="blocked">blocked</option>
+          <option value="stopped">stopped</option>
+          <option value="zombie">zombie</option>
+        </select>
+      </label>
+      <label>Trier :
+        <select id="sort">
+          <option value="cpu_desc">CPU ↓</option>
+          <option value="mem_desc">Mémoire ↓</option>
+          <option value="pid_asc">PID ↑</option>
+          <option value="name_asc">Nom ↑</option>
+        </select>
+      </label>
+      <button id="refresh" class="btn" type="button">Rafraîchir</button>
+      <span id="count" class="pill">0 éléments</span>
+      <span id="ts" class="muted"></span>
+      <span id="statusText" class="muted"></span>
+    </div>
+    <div class="hint" style="margin-top:8px">Astuce : clique sur les en-têtes CPU/Mémoire/PID/Nom pour changer le tri.</div>
+  </section>
+
+  <section class="card">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="pid" class="right">PID</th>
+          <th data-sort="name">Nom</th>
+          <th data-sort="user">Utilisateur</th>
+          <th data-sort="status">Statut</th>
+          <th data-sort="cpu" class="right">CPU %</th>
+          <th data-sort="memory" class="right">Mémoire %</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="6" class="muted">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <script>
+    const PS_URL = '/ps';
+    const REFRESH_INTERVAL = 5000; // 5s
+    let refreshing = false;
+
+    // tri state
+    let sortKey = 'cpu';
+    let sortDir = 'desc'; // 'asc'|'desc'
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+    }
+    function num(x) { x = Number(x); return Number.isFinite(x) ? x : 0; }
+
+    function applySortSelection() {
+      const v = document.getElementById('sort').value;
+      if (v === 'cpu_desc') { sortKey='cpu'; sortDir='desc'; }
+      else if (v === 'mem_desc') { sortKey='memory'; sortDir='desc'; }
+      else if (v === 'pid_asc') { sortKey='pid'; sortDir='asc'; }
+      else if (v === 'name_asc') { sortKey='name'; sortDir='asc'; }
+    }
+
+    function comparator(a, b) {
+      const dir = (sortDir === 'asc') ? 1 : -1;
+      if (sortKey === 'pid') return dir * (num(a.pid) - num(b.pid));
+      if (sortKey === 'cpu') return dir * (num(a.cpu) - num(b.cpu));
+      if (sortKey === 'memory') return dir * (num(a.memory) - num(b.memory));
+      if (sortKey === 'name') return dir * String(a.name||'').localeCompare(String(b.name||''), 'fr', {sensitivity:'base'});
+      if (sortKey === 'user') return dir * String(a.user||'').localeCompare(String(b.user||''), 'fr', {sensitivity:'base'});
+      if (sortKey === 'status') return dir * String(a.status||'').localeCompare(String(b.status||''), 'fr', {sensitivity:'base'});
+      return 0;
+    }
+
+    function filterItems(items) {
+      const q = (document.getElementById('q').value || '').trim().toLowerCase();
+      const st = document.getElementById('status').value;
+
+      return (items || []).filter(p => {
+        const pid = String(p.pid ?? '');
+        const name = String(p.name ?? '');
+        const user = String(p.user ?? '');
+        const status = String(p.status ?? '');
+        const hay = (pid + ' ' + name + ' ' + user).toLowerCase();
+        if (q && !hay.includes(q)) return false;
+        if (st && status !== st) return false;
+        return true;
+      });
+    }
+
+    function render(items) {
+      const tbody = document.getElementById('tbody');
+      const count = document.getElementById('count');
+
+      if (!Array.isArray(items) || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted">Aucune donnée</td></tr>';
+        count.textContent = '0 éléments';
+        return;
+      }
+
+      count.textContent = items.length + ' éléments';
+
+      tbody.innerHTML = items.map(p => {
+        const pid = p.pid ?? '';
+        const name = p.name ?? '';
+        const user = p.user ?? '';
+        const status = p.status ?? '';
+        const cpu = num(p.cpu);
+        const mem = num(p.memory);
+        return (
+          '<tr>'
+          + '<td class="right mono">' + esc(pid) + '</td>'
+          + '<td class="mono">' + esc(name) + '</td>'
+          + '<td>' + esc(user) + '</td>'
+          + '<td><span class="pill">' + esc(status) + '</span></td>'
+          + '<td class="right mono">' + cpu.toFixed(3) + '</td>'
+          + '<td class="right mono">' + mem.toFixed(3) + '</td>'
+          + '</tr>'
+        );
+      }).join('');
+    }
+
+    let DATA = [];
+
+    async function loadPs() {
+      if (refreshing) return;
+      refreshing = true;
+
+      const statusText = document.getElementById('statusText');
+      statusText.textContent = '⏳ mise à jour…';
+
+      try {
+        const res = await fetch(PS_URL, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const arr = await res.json();
+        DATA = Array.isArray(arr) ? arr : [];
+        applyFiltersAndRender();
+        document.getElementById('ts').textContent = 'Mis à jour : ' + new Date().toLocaleTimeString();
+        statusText.textContent = '✅ OK';
+      } catch (e) {
+        document.getElementById('tbody').innerHTML =
+          '<tr><td colspan="6" class="muted">Erreur: ' + esc(e.message) + '</td></tr>';
+        document.getElementById('count').textContent = '0 éléments';
+        statusText.textContent = '❌ ' + e.message;
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    function applyFiltersAndRender() {
+      applySortSelection();
+      const filtered = filterItems(DATA).slice().sort(comparator);
+      render(filtered);
+    }
+
+    // UI events
+    document.getElementById('q').addEventListener('input', applyFiltersAndRender);
+    document.getElementById('status').addEventListener('change', applyFiltersAndRender);
+    document.getElementById('sort').addEventListener('change', applyFiltersAndRender);
+
+    document.getElementById('refresh').addEventListener('click', async function(){
+      const btn = this, prev = btn.textContent;
+      btn.disabled = true; btn.textContent = '…';
+      try { await loadPs(); }
+      finally { btn.disabled = false; btn.textContent = prev; }
+    });
+
+    // Click headers to toggle sorting
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const k = th.getAttribute('data-sort');
+        if (!k) return;
+        if (sortKey === k) sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+        else { sortKey = k; sortDir = (k === 'pid' || k === 'name' || k === 'user' || k === 'status') ? 'asc' : 'desc'; }
+
+        // reflect in dropdown best-effort
+        const dd = document.getElementById('sort');
+        if (sortKey === 'cpu' && sortDir === 'desc') dd.value = 'cpu_desc';
+        else if (sortKey === 'memory' && sortDir === 'desc') dd.value = 'mem_desc';
+        else if (sortKey === 'pid' && sortDir === 'asc') dd.value = 'pid_asc';
+        else if (sortKey === 'name' && sortDir === 'asc') dd.value = 'name_asc';
+
+        applyFiltersAndRender();
+      });
+    });
+
+    // initial + 5s refresh
+    loadPs();
+    setInterval(loadPs, REFRESH_INTERVAL);
+  </script>
+
+</body>
+</html>

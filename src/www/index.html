@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Inventory — inventaire automatisé des postes, rapide, fiable, moderne." />
+  <title>Inventory — Reveleant Software Solution</title>
+  <style>
+    :root {
+      --bg0: #07110d;
+      --bg1: #0a1b14;
+      --card: rgba(255, 255, 255, .06);
+      --card2: rgba(255, 255, 255, .09);
+      --stroke: rgba(255, 255, 255, .12);
+      --text: rgba(255, 255, 255, .92);
+      --muted: rgba(255, 255, 255, .72);
+      --green: #38e38d;
+      --green2: #1fbf6a;
+      --shadow: 0 18px 60px rgba(0, 0, 0, .45);
+      --radius: 18px;
+      --radius2: 26px;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      height: 100%
+    }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background:
+        radial-gradient(1100px 700px at 20% 10%, rgba(56, 227, 141, .20), transparent 55%),
+        radial-gradient(900px 600px at 90% 40%, rgba(31, 191, 106, .16), transparent 60%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow-x: hidden;
+    }
+
+    a {
+      color: inherit
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 26px 18px 64px
+    }
+
+    /* Subtle “tech grid” */
+    .grid {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, .06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, .06) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: radial-gradient(700px 400px at 30% 20%, black 40%, transparent 85%);
+      opacity: .35;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .04));
+      border-radius: var(--radius2);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 200px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #fff, var(--green));
+      box-shadow: 0 0 0 6px rgba(56, 227, 141, .15), 0 0 26px rgba(56, 227, 141, .35);
+    }
+
+    .brand strong {
+      letter-spacing: .4px
+    }
+
+    .brand span {
+      display: block;
+      color: var(--muted);
+      font-size: 12.5px;
+      margin-top: 1px
+    }
+
+    nav {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end
+    }
+
+    .pill {
+      text-decoration: none;
+      font-size: 13px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, .04);
+    }
+
+    .pill:hover {
+      background: rgba(255, 255, 255, .07)
+    }
+
+    .cta {
+      text-decoration: none;
+      font-weight: 700;
+      letter-spacing: .2px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 227, 141, .35);
+      background: linear-gradient(180deg, rgba(56, 227, 141, .22), rgba(31, 191, 106, .12));
+      box-shadow: 0 10px 30px rgba(31, 191, 106, .18);
+    }
+
+    .cta:hover {
+      filter: brightness(1.05)
+    }
+
+    /* Quick links (2 lignes) */
+    .quick-links {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, .03);
+      border-radius: var(--radius);
+    }
+
+    .quick-links .ql-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding-top: 4px;
+    }
+
+    .quick-links .ql-row+.ql-row {
+      margin-top: 10px;
+    }
+
+    .quick-links .ql-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      width: 100%;
+      margin-bottom: 6px;
+      padding: 10px 14px;
+
+      border-radius: 12px;
+      border: 1px solid rgba(56, 227, 141, .32);
+
+      background:
+        linear-gradient(180deg,
+          rgba(56, 227, 141, .22),
+          rgba(31, 191, 106, .10));
+
+      color: rgba(255, 255, 255, .95);
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: .3px;
+
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, .06),
+        0 6px 18px rgba(31, 191, 106, .18);
+
+      text-transform: uppercase;
+    }
+
+
+    .quick-links .ql-row+.ql-row {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(56, 227, 141, .25);
+    }
+
+
+    .quick-links a.ql {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, .03);
+      color: rgba(255, 255, 255, .86);
+      text-decoration: none;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .quick-links a.ql:hover {
+      background: rgba(255, 255, 255, .06);
+      border-color: rgba(56, 227, 141, .28);
+    }
+
+    .quick-links a.ql code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      color: rgba(255, 255, 255, .72);
+      background: rgba(0, 0, 0, .14);
+      padding: 2px 6px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, .08);
+    }
+
+    /* Hero */
+    .hero {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 900px) {
+      .hero {
+        grid-template-columns: 1fr
+      }
+
+      nav {
+        justify-content: flex-start
+      }
+    }
+
+    .panel {
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .03));
+      border-radius: var(--radius2);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    .hero-left {
+      padding: 26px
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 227, 141, .28);
+      background: rgba(56, 227, 141, .09);
+      color: rgba(255, 255, 255, .86);
+      font-size: 13px;
+    }
+
+    .pulse {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 0 0 rgba(56, 227, 141, .45);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(56, 227, 141, .45)
+      }
+
+      70% {
+        box-shadow: 0 0 0 14px rgba(56, 227, 141, 0)
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(56, 227, 141, 0)
+      }
+    }
+
+    h1 {
+      margin: 16px 0 10px;
+      font-size: 42px;
+      line-height: 1.04;
+      letter-spacing: -.6px;
+    }
+
+    @media (max-width: 520px) {
+      h1 {
+        font-size: 34px
+      }
+    }
+
+    .lead {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 16.5px;
+      line-height: 1.55;
+      max-width: 62ch;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-decoration: none;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, .04);
+      font-weight: 700;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, .07)
+    }
+
+    .btn-primary {
+      border-color: rgba(56, 227, 141, .35);
+      background: linear-gradient(180deg, rgba(56, 227, 141, .25), rgba(31, 191, 106, .12));
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.05)
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: rgba(255, 255, 255, .62);
+      font-size: 12.5px;
+    }
+
+    /* Hero right: logo “card” */
+    .hero-right {
+      position: relative;
+      padding: 0;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+      min-height: 340px;
+    }
+
+    .logo-card {
+      position: relative;
+      width: 100%;
+      padding: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      isolation: isolate;
+    }
+
+    /* Put your Inventory logo file next to this HTML and name it: inventory.png */
+    .logo-image {
+      width: min(420px, 92%);
+      height: auto;
+      filter: drop-shadow(0 18px 42px rgba(0, 0, 0, .45));
+      border-radius: 10px;
+    }
+
+    .glow {
+      position: absolute;
+      inset: auto;
+      width: 520px;
+      height: 520px;
+      background: radial-gradient(circle at 35% 35%, rgba(56, 227, 141, .28), transparent 55%),
+        radial-gradient(circle at 60% 55%, rgba(31, 191, 106, .18), transparent 60%);
+      filter: blur(12px);
+      z-index: -1;
+      transform: translateY(-6px);
+      opacity: .9;
+    }
+
+    .scanline {
+      position: absolute;
+      left: -10%;
+      right: -10%;
+      height: 140px;
+      top: 40%;
+      background: linear-gradient(180deg,
+          transparent,
+          rgba(56, 227, 141, .16),
+          rgba(56, 227, 141, .08),
+          transparent);
+      transform: skewY(-4deg);
+      animation: sweep 4.8s ease-in-out infinite;
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    @keyframes sweep {
+      0% {
+        top: 18%;
+        opacity: .0
+      }
+
+      18% {
+        opacity: .55
+      }
+
+      50% {
+        top: 62%;
+        opacity: .35
+      }
+
+      100% {
+        top: 18%;
+        opacity: .0
+      }
+    }
+
+    /* Feature grid */
+    .features {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .features {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .card {
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .03));
+      box-shadow: 0 14px 40px rgba(0, 0, 0, .28);
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      letter-spacing: -.2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ico {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(56, 227, 141, .28);
+      background: rgba(56, 227, 141, .10);
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14.5px
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 22px;
+      padding: 16px 18px;
+      border-radius: var(--radius2);
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, .03);
+      color: rgba(255, 255, 255, .68);
+      font-size: 13px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .fine a {
+      opacity: .9
+    }
+
+    .fine a:hover {
+      opacity: 1
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 227, 141, .22);
+      background: rgba(56, 227, 141, .08);
+    }
+
+    .mini {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 18px rgba(56, 227, 141, .35);
+    }
+
+    @keyframes heartbeat {
+      0% {
+        transform: scale(1);
+      }
+
+      14% {
+        transform: scale(1.035);
+      }
+
+      28% {
+        transform: scale(1);
+      }
+
+      42% {
+        transform: scale(1.02);
+      }
+
+      70% {
+        transform: scale(1);
+      }
+
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    .logo-heartbeat {
+      animation: heartbeat 2.6s ease-in-out infinite;
+      transform-origin: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="grid" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <header>
+      <div class="brand" aria-label="Inventory">
+        <span class="dot" aria-hidden="true"></span>
+        <div>
+          <strong>Inventory</strong>
+          <span>Inventaire automatisé des postes • Agent actif</span>
+        </div>
+      </div>
+
+      <nav aria-label="Navigation">
+        <a class="pill" href="#fonctionnalites">Fonctionnalités</a>
+        <a class="pill" href="#securite">Sécurité</a>
+        <a class="pill" href="#contact">Contact</a>
+
+        <!-- IMPORTANT : remplacez ce lien par l'URL réelle de l'éditeur -->
+        <a class="cta" href="https://poudreverte.org/" target="_blank" rel="noopener noreferrer">
+          Site de l’éditeur
+        </a>
+      </nav>
+    </header>
+
+    <section class="hero" aria-label="Présentation">
+      <div class="panel hero-left">
+        <div class="kicker"><span class="pulse" aria-hidden="true"></span> Agent en ligne • Collecte temps réel</div>
+
+        <h1>Votre parc, <span style="color:var(--green)">clair</span> et <span style="color:var(--green2)">à
+            jour</span>.</h1>
+
+        <p class="lead">
+          <strong>Inventory</strong> automatise l’inventaire matériel & logiciel des postes sur le réseau :
+          collecte des constantes système, normalisation, historisation, et exposition via API.
+          Une interface moderne, sans lourdeur.
+        </p>
+
+        <div class="actions">
+          <!-- IMPORTANT : remplacez ce lien par l'URL réelle de l'éditeur -->
+          <a class="btn btn-primary" href="https://poudreverte.org/" target="_blank" rel="noopener noreferrer">
+            Ouvrir le site Reveleant
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a class="btn" href="#fonctionnalites">Voir les fonctionnalités</a>
+        </div>
+        <div class="quick-links" aria-label="Liens rapides composants Inventory">
+          <div class="ql-row">
+            <span class="ql-label">🧭 Rendus HTML</span>
+            <a class="ql" href="/disk.html" title="Partitions">💽 Partitions</a>
+            <a class="ql" href="/load.html" title="Charge">📈 Charge</a>
+            <a class="ql" href="/mem.html" title="Mémoire">🧠 Mémoire</a>
+            <a class="ql" href="/network.html" title="Carte réseau">🛰️ Réseau</a>
+            <a class="ql" href="/procs.html" title="Processus">🧩 Processus</a>
+          </div>
+
+          <div class="ql-row">
+            <span class="ql-label">🧪 Rendus JSON</span>
+            <a class="ql" href="/cpu" title="Processeurs">🧷 CPU</a>
+            <a class="ql" href="/ps" title="Processus">🧩 PS</a>
+            <a class="ql" href="/net" title="Carte réseau">🛰️ NET</a>
+            <a class="ql" href="/mem" title="Mémoire">🧠 MEM</a>
+            <a class="ql" href="/disk" title="Disque">💽 DISK</a>
+            <a class="ql" href="/load" title="Charge">📈 LOAD</a>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="panel hero-right" aria-label="Visuel">
+        <div class="logo-card">
+          <div class="glow" aria-hidden="true"></div>
+          <div class="scanline" aria-hidden="true"></div>
+
+          <!-- Remplacez inventory.png si vous souhaitez un autre nom de fichier -->
+          <img class="logo-image logo-heartbeat" src="img/inventory.png" alt="Logo Inventory" />
+        </div>
+      </div>
+    </section>
+
+    <section id="fonctionnalites" class="features" aria-label="Fonctionnalités">
+      <article class="card">
+        <h3><span class="ico" aria-hidden="true">⟲</span>Découverte & inventaire</h3>
+        <p>
+          Collecte automatique des constantes systèmes (CPU, RAM, stockage, OS, logiciels, services),
+          avec un format homogène pour simplifier le reporting.
+        </p>
+      </article>
+
+      <article class="card" id="securite">
+        <h3><span class="ico" aria-hidden="true">🛡</span>Sécurisé par conception</h3>
+        <p>
+          Communication chiffrée, authentification de l’agent, et principe du moindre privilège.
+          L’inventaire sans ouvrir des portes inutiles.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3><span class="ico" aria-hidden="true">⚡</span>API & intégrations</h3>
+        <p>
+          Données prêtes pour l’ITSM / CMDB : endpoints simples, export, et intégration dans vos
+          dashboards (et vos scripts qui sauvent la journée).
+        </p>
+      </article>
+    </section>
+
+    <footer id="contact" aria-label="Pied de page">
+      <div class="badge"><span class="mini" aria-hidden="true"></span>Inventory • Agent actif</div>
+
+      <div class="fine">
+        Édité par <strong>Reveleant Software Solution</strong> —
+        <a href="https://poudreverte.org/" target="_blank" rel="noopener noreferrer">accéder au site</a>
+      </div>
+    </footer>
+  </div>
+</body>
+
+</html>

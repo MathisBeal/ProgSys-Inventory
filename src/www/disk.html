@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+  <meta charset="utf-8">
+  <title>Disques · volumes & points de montage</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: canvas;
+      color: canvastext;
+    }
+
+    .card {
+      max-width: 1100px;
+      margin: 0 auto 16px;
+      padding: 16px 20px;
+      border: 1px solid color-mix(in oklab, canvastext 15%, transparent);
+      border-radius: 16px;
+      background: color-mix(in oklab, canvas 92%, canvastext 0%);
+      box-shadow: 0 1px 8px color-mix(in oklab, canvastext 10%, transparent);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.25rem;
+    }
+
+    .muted {
+      opacity: .75;
+      font-size: .9rem;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: .15rem .5rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in oklab, canvastext 18%, transparent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid color-mix(in oklab, canvastext 12%, transparent);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: .9rem;
+    }
+
+    .badges {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: .12rem .45rem;
+      border-radius: .5rem;
+      border: 1px solid color-mix(in oklab, canvastext 25%, transparent);
+      font-size: .85rem;
+    }
+
+    .right {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .w-usage {
+      min-width: 120px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <section class="card">
+    <h1>Disques / partitions</h1>
+    <div class="muted">
+      <span class="pill">Source: <span class="mono">/disk</span></span>
+      <span class="pill">Refresh: <span class="mono">5s</span></span>
+      <span class="pill">Dernière mise à jour: <span id="updatedAt" class="mono">—</span></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Device</th>
+          <th>Mountpoint</th>
+          <th>Type</th>
+          <th>Options</th>
+          <th class="right">Total</th>
+          <th class="right">Utilisé</th>
+          <th class="right">Libre</th>
+          <th class="right w-usage">Utilisé %</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr>
+          <td colspan="8" class="muted">Chargement…</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <script>
+    const DISK_URL = '/disk';
+    const REFRESH_INTERVAL = 5000; // 5 secondes
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function fmtBytes(n) {
+      if (typeof n !== 'number' || !isFinite(n) || n < 0) return '—';
+      const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+      let u = 0;
+      let v = n;
+      while (v >= 1024 && u < units.length - 1) { v /= 1024; u++; }
+      const digits = (u === 0) ? 0 : (u <= 2 ? 1 : 2);
+      return v.toFixed(digits) + ' ' + units[u];
+    }
+
+    function fmtPercent(n) {
+      if (typeof n !== 'number' || !isFinite(n)) return '—';
+      return n.toFixed(1) + ' %';
+    }
+
+    function renderRows(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        return '<tr><td colspan="8" class="muted">Aucune donnée</td></tr>';
+      }
+
+      return items.map(function (x) {
+        const p = x && x.partition ? x.partition : {};
+        const u = x && x.usage ? x.usage : null;
+
+        const opts = Array.isArray(p.opts) ? p.opts : [];
+        const optsHtml = opts.length
+          ? ('<div class="badges">' + opts.map(function (o) {
+            return '<span class="badge">' + esc(o) + '</span>';
+          }).join('') + '</div>')
+          : '<span class="muted">—</span>';
+
+        const total = u ? fmtBytes(u.total) : '—';
+        const used = u ? fmtBytes(u.used) : '—';
+        const free = u ? fmtBytes(u.free) : '—';
+        const usedPct = u ? fmtPercent(u.usedPercent) : '—';
+
+        return '<tr>'
+          + '<td class="mono">' + esc(p.device || '') + '</td>'
+          + '<td class="mono">' + esc(p.mountpoint || '') + '</td>'
+          + '<td>' + esc(p.fstype || '') + '</td>'
+          + '<td>' + optsHtml + '</td>'
+          + '<td class="right mono">' + esc(total) + '</td>'
+          + '<td class="right mono">' + esc(used) + '</td>'
+          + '<td class="right mono">' + esc(free) + '</td>'
+          + '<td class="right mono">' + esc(usedPct) + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    let inFlight = false;
+
+    async function refresh() {
+      if (inFlight) return;
+      inFlight = true;
+
+      const body = document.getElementById('tbody');
+      try {
+        // Si ton HTML est servi via un reverse-proxy (recommandé), DISK_URL suffit (same-origin).
+        // Si tu dois pointer un serveur distant, remplace par une URL absolue ici.
+        const res = await fetch(DISK_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        body.innerHTML = renderRows(data);
+
+        const now = new Date();
+        document.getElementById('updatedAt').textContent = now.toLocaleString();
+      } catch (e) {
+        body.innerHTML = '<tr><td colspan="8" class="muted">Erreur: ' + esc(e.message) + '</td></tr>';
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    // chargement immédiat + refresh périodique
+    refresh();
+    setInterval(refresh, REFRESH_INTERVAL);
+  </script>
+
+</body>
+
+</html>
