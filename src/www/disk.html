@@ -200,8 +200,6 @@
 
       const body = document.getElementById('tbody');
       try {
-        // Si ton HTML est servi via un reverse-proxy (recommandé), DISK_URL suffit (same-origin).
-        // Si tu dois pointer un serveur distant, remplace par une URL absolue ici.
         const res = await fetch(DISK_URL, { cache: 'no-store' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
@@ -216,7 +214,6 @@
       }
     }
 
-    // chargement immédiat + refresh périodique
     refresh();
     setInterval(refresh, REFRESH_INTERVAL);
   </script>
